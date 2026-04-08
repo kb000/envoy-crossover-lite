@@ -30,10 +30,6 @@ xdsLoader:
     tag: canary-b425902
   syncInterval: 30s
 
-smi:
-  apiVersions:
-    trafficSplits: v1alpha2
-
 initContainersTemplate: |-
   - name: xds-init
     image: {{ .Values.xdsLoader.image.repository }}:{{ .Values.xdsLoader.image.tag }}
@@ -42,12 +38,6 @@ initContainersTemplate: |-
     args:
     - --apiserver={{ .Values.apiserver }}
     - --configmap={{ template "envoy.fullname" . }}-xds
-    {{ range $name, $upstream := .Values.upstreams -}}
-    {{ if $upstream.smi.enabled -}}
-    - --trafficsplit={{ $name }}
-    {{ end -}}
-    {{ end -}}
-    - --trafficsplit-api-version={{ .Values.smi.apiVersions.trafficSplits }}
     - --onetime
     - --insecure
     env:
@@ -67,12 +57,6 @@ sidecarContainersTemplate: |-
     args:
     - --apiserver={{ .Values.apiserver }}
     - --configmap={{ template "envoy.fullname" . }}-xds
-    {{ range $name, $upstream := .Values.upstreams -}}
-    {{ if $upstream.smi.enabled -}}
-    - --trafficsplit={{ $name }}
-    {{ end -}}
-    {{ end -}}
-    - --trafficsplit-api-version={{ .Values.smi.apiVersions.trafficSplits }}
     - --sync-interval={{ .Values.xdsLoader.syncInterval }}
     - --watch
     - --insecure

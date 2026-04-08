@@ -26,11 +26,6 @@ rules:
     resources:
       - horizontalpodautoscalers
     verbs: ["*"]
-  - apiGroups:
-      - split.smi-spec.io
-    resources:
-      - trafficsplits
-    verbs: ["*"]
   - nonResourceURLs:
       - /version
     verbs:

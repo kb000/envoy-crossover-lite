@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -15,20 +14,16 @@ import (
 )
 
 type Manager struct {
-	Namespace     string
-	Noop          bool
-	Token         string
-	Insecure      bool
-	Server        string
-	SMIEnabled    bool
-	Watch         bool
-	SyncInterval  time.Duration
-	OutputDir     string
-	Onetime       bool
-	ConfigMaps    StringSlice
-	TrafficSplits StringSlice
-
-	SMITrafficSplitVersion string
+	Namespace    string
+	Noop         bool
+	Token        string
+	Insecure     bool
+	Server       string
+	Watch        bool
+	SyncInterval time.Duration
+	OutputDir    string
+	Onetime      bool
+	ConfigMaps   StringSlice
 }
 
 func (m *Manager) Run(ctx context.Context) error {
@@ -42,19 +37,6 @@ func (m *Manager) Run(ctx context.Context) error {
 		HttpClient:   createHttpClient(m.Insecure),
 	}
 
-	var genConfigs []string
-	if m.SMIEnabled {
-		for _, c := range m.ConfigMaps {
-			genCM := c + "-gen"
-			genConfigs = append(genConfigs, genCM)
-
-			if err := m.InitConfigMap(m.Namespace, c, genCM, cmclient); err != nil {
-				return err
-			}
-		}
-	} else {
-		genConfigs = m.ConfigMaps
-	}
 	configmaps := &Controller{
 		updated:   make(chan string),
 		namespace: m.Namespace,
@@ -64,41 +46,9 @@ func (m *Manager) Run(ctx context.Context) error {
 			Namespace: m.Namespace,
 			OutputDir: m.OutputDir,
 		},
-		resourceNames: genConfigs,
+		resourceNames: m.ConfigMaps,
 	}
 
-	if m.SMIEnabled {
-		if len(m.ConfigMaps) != len(m.TrafficSplits) {
-			return fmt.Errorf("mismatching number of configmaps and trafficsplits")
-		}
-		tsToConfigs := map[string]string{}
-		for i := range m.ConfigMaps {
-			tsToConfigs[m.TrafficSplits[i]] = m.ConfigMaps[i]
-		}
-		tsclient := &kubeclient.KubeClient{
-			Resource:     "trafficsplits",
-			GroupVersion: "apis/split.smi-spec.io/" + m.SMITrafficSplitVersion,
-			Server:       m.Server,
-			Token:        m.Token,
-			HttpClient:   createHttpClient(m.Insecure),
-		}
-		trafficsplits := &Controller{
-			updated:   make(chan string),
-			namespace: m.Namespace,
-			client:    tsclient,
-			reconciler: &reconciler.TrafficSplitReconciler{
-				TrafficSplits: tsclient,
-				ConfigMaps:    cmclient,
-				TsToConfigs: tsToConfigs,
-				Namespace:     m.Namespace,
-			},
-			resourceNames: m.TrafficSplits,
-		}
-
-		// trafficsplits controller needs to be before configmaps controller
-		// so that the former can create <configmap-name>-gen from <confgimap-name> that is rendered to the local fs
-		controllers = append(controllers, trafficsplits)
-	}
 	controllers = append(controllers, configmaps)
 
 	if m.Onetime {
