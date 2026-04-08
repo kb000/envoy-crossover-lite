@@ -40,29 +40,18 @@ else
   VEGETA_EXTRA_FLAGS="-http2=false"
 fi
 
-if [ ! -z "${USE_SMI}" ]; then
-  ENVOY_EXTRA_ARGS="${ENVOY_EXTRA_ARGS} --set services.podinfo.smi.enabled=true"
-fi
-
 # Clean up resources left by the previous e2e run
-kubectl delete -f example/smi/trafficsplits.crd.yaml || true
-kubectl delete -f example/smi/trafficsplits-v1alpha1.crd.yaml || true
 kubectl delete canary podinfo && sleep 10 || :
 kubectl delete trafficsplit podinfo || :
 
 if [ ! -z "${USE_FLAGGER}" ]; then
-    ENVOY_EXTRA_ARGS="${ENVOY_EXTRA_ARGS} --set smi.apiVersions.trafficSplits=v1alpha1"
 
   $HELM repo add flagger https://flagger.app
   $HELM upgrade --install flagger flagger/flagger \
     --set image.repository=mumoshu/flagger \
-    --set meshProvider=smi:envoy-crossover \
     --set image.tag=k8s-svc-v1 \
     --set crd.create=true \
     --wait
-
-  # Given this CRD, Flagger is able to automatically create trafficsplit on demand
-  kubectl apply -f example/smi/trafficsplits-v1alpha1.crd.yaml
 
   RELEASE=eerie-octopus
   kubectl apply -f - <<EOS
@@ -96,7 +85,6 @@ metadata:
   name: podinfo
   namespace: default
 spec:
-  provider: smi:crossover-envoy
   # deployment reference
   targetRef:
     apiVersion: core/v1
@@ -114,8 +102,6 @@ spec:
     threshold: 2
     metrics: []
 EOS
-else
-  kubectl apply -f example/smi/trafficsplits.crd.yaml
 fi
 
 PODINFO_FLAGS="--set image.tag=3.1.4 --set canary.enabled=false ${PODINFO_EXTRA_FLAGS}"
@@ -129,12 +115,6 @@ $HELM upgrade --install eerie-octopus "${PODINFO_CHART}" --wait ${PODINFO_FLAGS}
 sleep 5
 
 echo Setting up Envoy front proxy.
-
-if [ ! -z "${USE_FLAGGER}" ]; then
-  :
-elif [ ! -z "${USE_SMI}" ]; then
-  kubectl apply -f example/smi/podinfo-v0.trafficsplit.yaml
-fi
 
 $HELM repo add stable https://kubernetes-charts.storage.googleapis.com
 $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
@@ -191,8 +171,6 @@ spec:
     release: ${RELEASE}
   type: ClusterIP
 EOS
-elif [ ! -z "${USE_SMI}" ]; then
-  kubectl apply -f example/smi/podinfo-v1.trafficsplit.yaml
 else
   $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
   --set services.podinfo.backends.${CANARY_SVC}.weight=25 \
@@ -204,8 +182,6 @@ sleep 5
 # 50% eerie-octopus
 if [ ! -z "${USE_FLAGGER}" ]; then
   :
-elif [ ! -z "${USE_SMI}" ]; then
-  kubectl apply -f example/smi/podinfo-v2.trafficsplit.yaml
 else
   $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
   --set services.podinfo.backends.${CANARY_SVC}.weight=50 \
@@ -217,8 +193,6 @@ sleep 5
 # 75% eerie-octopus
 if [ ! -z "${USE_FLAGGER}" ]; then
   :
-elif [ ! -z "${USE_SMI}" ]; then
-  kubectl apply -f example/smi/podinfo-v3.trafficsplit.yaml
 else
   $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
   --set services.podinfo.backends.${CANARY_SVC}.weight=75 \
@@ -229,10 +203,6 @@ sleep 5
 
 # 100% eerie-octopus
 if [ ! -z "${USE_FLAGGER}" ]; then
-  :
-elif [ ! -z "${USE_SMI}" ]; then
-  kubectl apply -f example/smi/podinfo-v4.trafficsplit.yaml
-else
   $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
   --set services.podinfo.backends.${CANARY_SVC}.weight=100 \
   --set services.podinfo.backends.${PRIMARY_SVC}.weight=0 ${ENVOY_EXTRA_ARGS} ${HELM_EXTRA_ARGS}

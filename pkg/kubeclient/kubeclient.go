@@ -29,7 +29,7 @@ type Client interface {
 type KubeClient struct {
 	Resource      string
 	Token, Server string
-	// api/v1 for configmaps, apis/split.smi-spec.io/v1alpha2 for trafficsplits
+	// api/v1 for configmaps
 	GroupVersion string
 	HttpClient   *http.Client
 }
@@ -105,7 +105,7 @@ WATCHES:
 			scanner := bufio.NewScanner(resp.Body)
 
 			// Read chunks until error or stop
-			for names != nil  && scanner.Scan() {
+			for names != nil && scanner.Scan() {
 				log.Printf("Watch reading next chunk...")
 				evt := map[string]interface{}{}
 				body := scanner.Bytes()

@@ -44,19 +44,6 @@ run/watch: build
 	  --watch \
 	  --output-dir "./test/out"
 
-.PHONY: run/watch-smi
-run/watch-smi: build
-	./crossover \
-	  --namespace default \
-	  --token-file ./mytoken \
-	  --configmap envoy-xds \
-	  --trafficsplit podinfo \
-	  --insecure \
-	  --apiserver "https://kubernetes.docker.internal:6443" \
-	  --watch \
-	  --smi \
-	  --output-dir "./test/out"
-
 .PHONY: watch
 watch:
 	@curl -s -k -H "Authorization: Bearer $(shell cat ./mytoken)" https://kubernetes.docker.internal:6443/api/v1/watch/namespaces/default/configmaps/incendiary-shark-envoy-xds
@@ -68,18 +55,6 @@ e2e/h2c:
 .PHONY: e2e/h1
 e2e/h1:
 	./e2e/run-testsuite.sh
-
-.PHONY: e2e/h2c-smi
-e2e/h2c-smi:
-	USE_H2C=1 USE_SMI=1 ./e2e/run-testsuite.sh
-
-.PHONY: e2e/h1-smi
-e2e/h1-smi:
-	USE_SMI=1 ./e2e/run-testsuite.sh
-
-.PHONY: e2e/h1-smi-flagger
-e2e/h1-smi-flagger:
-	USE_FLAGGER=1 USE_SMI=1 ./e2e/run-testsuite.sh
 
 .PHONY: e2e/jplot
 e2e/jplot:

@@ -1,7 +1,5 @@
 services:
   podinfo:
-    smi:
-      enabled: false
     backends:
       eerie-octopus-podinfo:
         port: 9898

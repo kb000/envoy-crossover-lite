@@ -1,7 +1,5 @@
 services:
   podinfo:
-    smi:
-      enabled: false
     backends:
       podinfo-primary:
         port: 9898
