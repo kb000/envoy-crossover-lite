@@ -69,6 +69,6 @@ func TestUpdate(t *testing.T) {
 `
 	diff := cmp.Diff(expected, bs)
 	if diff != "" {
-		t.Errorf(diff)
+		t.Errorf("%s", diff)
 	}
 }
