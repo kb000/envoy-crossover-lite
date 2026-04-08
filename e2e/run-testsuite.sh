@@ -18,17 +18,9 @@ USE_H2C=${USE_H2C:-}
 echo Using $PODINFO_CHART
 echo USE_H2C=${USE_H2C}
 
-ENVOY_EXTRA_ARGS=""
-
-if [ ! -z "${USE_FLAGGER}" ]; then
-  PRIMARY_SVC=podinfo-primary
-  CANARY_SVC=podinfo-canary
-  ENVOY_EXTRA_ARGS="-f example/values.flagger.yaml"
-else
-  PRIMARY_SVC=bold-olm-podinfo
-  CANARY_SVC=eerie-octopus-podinfo
-  ENVOY_EXTRA_ARGS="-f example/values.services.yaml"
-fi
+PRIMARY_SVC=bold-olm-podinfo
+CANARY_SVC=eerie-octopus-podinfo
+ENVOY_EXTRA_ARGS="-f example/values.services.yaml"
 
 PODINFO_EXTRA_FLAGS=""
 VEGETA_EXTRA_FLAGS=""
@@ -38,70 +30,6 @@ if [ ! -z "${USE_H2C}" ]; then
   VEGETA_EXTRA_FLAGS="-http2=true -h2c"
 else
   VEGETA_EXTRA_FLAGS="-http2=false"
-fi
-
-# Clean up resources left by the previous e2e run
-kubectl delete canary podinfo && sleep 10 || :
-kubectl delete trafficsplit podinfo || :
-
-if [ ! -z "${USE_FLAGGER}" ]; then
-
-  $HELM repo add flagger https://flagger.app
-  $HELM upgrade --install flagger flagger/flagger \
-    --set image.repository=mumoshu/flagger \
-    --set image.tag=k8s-svc-v1 \
-    --set crd.create=true \
-    --wait
-
-  RELEASE=eerie-octopus
-  kubectl apply -f - <<EOS
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: podinfo
-  name: podinfo
-  namespace: default
-spec:
-  ports:
-  - name: http
-    port: 9898
-    protocol: TCP
-    targetPort: http
-  - name: grpc
-    port: 9999
-    protocol: TCP
-    targetPort: grpc
-  selector:
-    app: podinfo
-    release: ${RELEASE}
-  type: ClusterIP
-EOS
-
-  kubectl apply -f - << EOS
-apiVersion: flagger.app/v1alpha3
-kind: Canary
-metadata:
-  name: podinfo
-  namespace: default
-spec:
-  # deployment reference
-  targetRef:
-    apiVersion: core/v1
-    kind: Service
-    name: podinfo
-  service:
-    port: 9898
-  canaryAnalysis:
-    # schedule interval
-    interval: 5s
-    # canary increment step in percentage
-    stepWeight: 20
-    # We don't need this for canary release. Setting iterations enables Blue/Green deployment
-    #iterations: 5
-    threshold: 2
-    metrics: []
-EOS
 fi
 
 PODINFO_FLAGS="--set image.tag=3.1.4 --set canary.enabled=false ${PODINFO_EXTRA_FLAGS}"
@@ -131,10 +59,6 @@ echo Starting Vegeta.
 
 DURATION=${DURATION:-30s}
 
-if [ ! -z "${USE_FLAGGER}" ]; then
-  DURATION=100s
-fi
-
 VEGETA_EXTRA_FLAGS=$VEGETA_EXTRA_FLAGS RATE=30 TARGET_ADDR=http://localhost:10000/headers DURATION="${DURATION}" $(dirname $0)/tools.sh encode | \
   tee e2e.encode.log | \
   $(dirname $0)/tools.sh parse | \
@@ -146,67 +70,23 @@ vegeta_pid=$!
 sleep 5
 
 # 25% eerie-octopus
-if [ ! -z "${USE_FLAGGER}" ]; then
-  RELEASE=bold-olm
-  kubectl apply -f - <<EOS
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: podinfo
-  name: podinfo
-  namespace: default
-spec:
-  ports:
-  - name: http
-    port: 9898
-    protocol: TCP
-    targetPort: http
-  - name: grpc
-    port: 9999
-    protocol: TCP
-    targetPort: grpc
-  selector:
-    app: podinfo
-    release: ${RELEASE}
-  type: ClusterIP
-EOS
-else
-  $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
+$HELM upgrade --install envoy stable/envoy -f example/values.yaml \
   --set services.podinfo.backends.${CANARY_SVC}.weight=25 \
   --set services.podinfo.backends.${PRIMARY_SVC}.weight=75 ${ENVOY_EXTRA_ARGS} ${HELM_EXTRA_ARGS}
-fi
 
 sleep 5
 
 # 50% eerie-octopus
-if [ ! -z "${USE_FLAGGER}" ]; then
-  :
-else
-  $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
+$HELM upgrade --install envoy stable/envoy -f example/values.yaml \
   --set services.podinfo.backends.${CANARY_SVC}.weight=50 \
   --set services.podinfo.backends.${PRIMARY_SVC}.weight=50 ${ENVOY_EXTRA_ARGS} ${HELM_EXTRA_ARGS}
-fi
 
 sleep 5
 
 # 75% eerie-octopus
-if [ ! -z "${USE_FLAGGER}" ]; then
-  :
-else
-  $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
+$HELM upgrade --install envoy stable/envoy -f example/values.yaml \
   --set services.podinfo.backends.${CANARY_SVC}.weight=75 \
   --set services.podinfo.backends.${PRIMARY_SVC}.weight=25 ${ENVOY_EXTRA_ARGS} ${HELM_EXTRA_ARGS}
-fi
-
-sleep 5
-
-# 100% eerie-octopus
-if [ ! -z "${USE_FLAGGER}" ]; then
-  $HELM upgrade --install envoy stable/envoy -f example/values.yaml \
-  --set services.podinfo.backends.${CANARY_SVC}.weight=100 \
-  --set services.podinfo.backends.${PRIMARY_SVC}.weight=0 ${ENVOY_EXTRA_ARGS} ${HELM_EXTRA_ARGS}
-fi
 
 sleep 5
 

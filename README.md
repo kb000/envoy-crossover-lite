@@ -23,8 +23,6 @@ No need for `kubectl`, `client-go`, `apimachineary` or even Envoy's `go-control-
 
 You always start with a standard Envoy without `crossover`. If you're happy with that, keep using it and don't bother with adding additional moving part to the mix.
 
-Canary deployments with [Flagger](https://github.com/weaveworks/flagger)?
-
 Reconfigure Envoy without time-consuming and unreliable reloads?
 
 Enter `crossover`.
@@ -148,54 +146,7 @@ Usage of ./crossover:
 
 ## Getting Started
 
-Try weighted load-balancing using `crossover`!
-
-Deploy Envoy along with the loader using the `stable/envoy` chart:
-
-```
-helm repo add stable https://kubernetes-charts.storage.googleapis.com
-helm upgrade --install envoy stable/envoy -f example/values.yaml -f example/values.services.yaml
-```
-
-Or by using `crossover/envoy` chart:
-
-```
-helm repo add crossover https://mumoshu.github.io/crossover
-helm upgrade --install envoy crossover/envoy -f example/values.upstreams.yaml
-```
-
-Then install backends - we use @stefanprodan's awesome [podinfo](https://github.com/stefanprodan/podinfo):
-
-```
-helm repo add flagger https://flagger.app
-helm upgrade --install bold-olm flagger/podinfo --set canary.enabled=false
-helm upgrade --install eerie-octopus flagger/podinfo --set canary.enabled=false
-```
-
-In another terminal, run the tester pod to watch traffic shifts:
-
-```
-kubectl run -it --rm --image alpine:3.9 tester sh
-
-apk add --update curl
-watch curl http://envoy:10000
-```
-
-Finally, try changing load-balancing weights instantly and without restarting Envoy at all:
-
-```
-# 100% bold-olm
-helm upgrade --install envoy stable/envoy -f example/values.yaml -f example/values.services.yaml \
-  --set services.podinfo.backends.eerie-octopus-podinfo.weight=0 \
-  --set services.podinfo.backends.bold-olm-podinfo.weight=100
-
-# 100% eerie-octopus
-helm upgrade --install envoy stable/envoy -f example/values.yaml -f example/values.services.yaml \
-  --set services.podinfo.backends.eerie-octopus-podinfo.weight=100 \
-  --set services.podinfo.backends.bold-olm-podinfo.weight=0
-```
-
-See [example/values.yaml](example/values.yaml) for more details on the configuration.
+See [example/values.yaml](example/values.yaml) for more example configuration.
 
 ## Developing
 
@@ -238,7 +189,6 @@ Kubernetes CRD and gRPC server based implementations
 - [Contour](https://github.com/projectcontour/contour)
 - [Ambassador](https://github.com/datawire/ambassador)
 - [Gloo](https://github.com/solo-io/gloo)
-- [flagger-appmesh-gateway](https://github.com/stefanprodan/flagger-appmesh-gateway)
 
 Consul and gRPC server based implementations
 
